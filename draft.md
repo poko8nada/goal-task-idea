@@ -105,6 +105,57 @@
 - v1: ローカルで動作、エージェントがJSONファイルを読んで壁打ち・相談相手になる
 - エージェントがより良い助言をするために、ユーザーのプロフィールや企業のパフォーマンス情報などのコンテキストを`context`フィールドに持たせる
 
+## 永続化レイヤー
+
+### v1（ローカル）
+
+- 保存場所: `app/data.json`
+- 読み書き: サーバーAPI（`GET/POST /api/items`）が`fs`で読み書き
+- AIエージェントはファイルを直接読める
+
+### v2（Cloudflareデプロイ + ログイン）
+
+- 保存場所: D1（SQLite）またはKV（Key-Value）
+- 読み書き: 同じAPIエンドポイントがD1/KVを操作
+- 認証: ログイン機能と連携
+
+### 抽象化方針
+
+Storageインターフェースで実装を交換可能にする：
+
+```ts
+// app/lib/storage.ts
+export interface Storage {
+  getProject(): Promise<Project>;
+  getItems(): Promise<Item[]>;
+  getContext(): Promise<Context>;
+  saveProject(project: Project): Promise<void>;
+  saveItems(items: Item[]): Promise<void>;
+  saveContext(context: Context): Promise<void>;
+}
+```
+
+実装:
+- v1: `FileStorage`（`fs.readFileSync`/`writeFileSync`）
+- v2: `D1Storage` / `KVStorage`（D1バインディング使用）
+
+依存の方向:
+- ルート（APIエンドポイント）→ Storageインターフェース
+- Storageインターフェース ← FileStorage / D1Storage
+- ルートは具体的な実装を知らない
+
+利点:
+- v1→v2移行時、ルート層の変更不要
+- テスト時にモックStorageに差し替え可能
+- 将来的にR2（オブジェクトストレージ）等への移行も容易
+
+### Cloudflare Workers制約（v2事前確認）
+
+- `fs`は使えない（read-onlyバンドル以外）
+- ビルド時にJSONを埋め込むか、D1/KV/R2を使う
+- v1の`FileStorage`は`@hono/vite-dev-server`（node adapter経由）でのみ動作
+- v2ビルド時はStorage実装を切り替える必要がある
+
 ## スタック・バージョン計画
 
 - **スタック**: HonoX + Vite + TailwindCSS

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // ── rule mapping ─────────────────────────────────────────────────────────────
+// (test edit to verify rule-inject)
 
 const EXT_TO_RULE: Array<{ exts: string[]; rule: string }> = [
   { exts: ['.ts', '.tsx', '.js', '.jsx'], rule: 'typescript.mdc' },
@@ -40,98 +41,35 @@ function loadRule(rulesDir: string, ruleName: string): string | null {
 
 // ── plugin ───────────────────────────────────────────────────────────────────
 
-export const RuleInjectPlugin: Plugin = async ({ client, worktree }) => {
+export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
   const rulesDir = path.join(worktree, '.opencode', 'rules');
-
-  await client.app
-    .log({
-      body: {
-        service: 'rule-inject',
-        level: 'info',
-        message: `RuleInjectPlugin loaded. rulesDir=${rulesDir}`,
-      },
-    })
-    .catch(() => {});
-
-  const state = new Map<string, { editedFiles: Set<string> }>();
-
-  const getState = (sessionID: string) => {
-    if (!state.has(sessionID)) {
-      state.set(sessionID, { editedFiles: new Set() });
-    }
-    return state.get(sessionID)!;
-  };
+  const editedFiles = new Set<string>();
 
   return {
-    event: async ({ event }) => {
-      if (event.type === 'file.edited') {
-        const file = (event.properties as { file?: string }).file;
-        if (!file) return;
-        for (const s of state.values()) {
-          s.editedFiles.add(file);
-        }
-        await client.app
-          .log({
-            body: {
-              service: 'rule-inject',
-              level: 'debug',
-              message: `file.edited: ${file}`,
-            },
-          })
-          .catch(() => {});
-      }
-
-      if (event.type === 'session.created') {
-        const id = (event.properties as { info?: { id?: string } }).info?.id;
-        if (id) getState(id);
-      }
-    },
-
     'tool.execute.after': async (input) => {
       if (!['write', 'edit', 'apply_patch'].includes(input.tool)) return;
       const args = input.args as { filePath?: string; path?: string } | undefined;
       const filePath = args?.filePath ?? args?.path ?? '';
-      if (!filePath) return;
-      for (const s of state.values()) {
-        s.editedFiles.add(filePath);
-      }
-      await client.app
-        .log({
-          body: {
-            service: 'rule-inject',
-            level: 'debug',
-            message: `tool.execute.after (${input.tool}): ${filePath}`,
-          },
-        })
-        .catch(() => {});
+      if (filePath) editedFiles.add(filePath);
+    },
+
+    event: async ({ event }) => {
+      if (event.type !== 'file.edited') return;
+      const file = (event.properties as { file?: string }).file;
+      if (file) editedFiles.add(file);
     },
 
     'tool.execute.before': async (input, output) => {
       if (input.tool !== 'bash') return;
-
       const command: string = output?.args?.command ?? '';
       if (!/\bgit commit\b/.test(command)) return;
 
-      const sessionID = input.sessionID;
-      if (!sessionID) return;
+      const touched = [...editedFiles];
+      if (touched.length === 0) return;
 
-      const s = getState(sessionID);
-      if (s.editedFiles.size === 0) {
-        await client.app
-          .log({
-            body: {
-              service: 'rule-inject',
-              level: 'debug',
-              message: 'git commit detected but no edited files tracked',
-            },
-          })
-          .catch(() => {});
-        return;
-      }
-
-      const ruleNames = getRulesForFiles([...s.editedFiles]);
+      const ruleNames = getRulesForFiles(touched);
       if (ruleNames.size === 0) {
-        s.editedFiles.clear();
+        editedFiles.clear();
         return;
       }
 
@@ -142,31 +80,21 @@ export const RuleInjectPlugin: Plugin = async ({ client, worktree }) => {
           loadedRules.push(`### ${ruleName}\n\n${content}`);
         }
       }
-
       if (loadedRules.length === 0) {
-        s.editedFiles.clear();
+        editedFiles.clear();
         return;
       }
 
-      const editedFiles = [...s.editedFiles];
-      s.editedFiles.clear();
-
-      await client.app
-        .log({
-          body: {
-            service: 'rule-inject',
-            level: 'info',
-            message: `Blocking git commit. Files: ${editedFiles.join(', ')}`,
-          },
-        })
-        .catch(() => {});
+      // First commit attempt: block and clear state.
+      // Next commit attempt will see editedFiles.size === 0 and pass.
+      editedFiles.clear();
 
       throw new Error(
         `
 [rule-inject] Commit blocked. Review required.
 
 Edited files:
-${editedFiles.map((f) => `- \`${f}\``).join('\n')}
+${touched.map((f) => `- \`${f}\``).join('\n')}
 
 Rules to verify:
 ${loadedRules.join('\n\n---\n\n')}
@@ -174,7 +102,7 @@ ${loadedRules.join('\n\n---\n\n')}
 Instructions:
 1. Review your changes against the rules above.
 2. Fix any violations.
-3. Run git commit again.
+3. Run git commit again — the second attempt will pass.
       `.trim(),
       );
     },

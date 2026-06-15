@@ -1,4 +1,3 @@
-//@ts-nocheck
 import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -41,8 +40,18 @@ function loadRule(rulesDir: string, ruleName: string): string | null {
 
 // ── plugin ───────────────────────────────────────────────────────────────────
 
-export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
+export const RuleInjectPlugin: Plugin = async ({ client, worktree }) => {
   const rulesDir = path.join(worktree, '.opencode', 'rules');
+
+  await client.app
+    .log({
+      body: {
+        service: 'rule-inject',
+        level: 'info',
+        message: `RuleInjectPlugin loaded. rulesDir=${rulesDir}`,
+      },
+    })
+    .catch(() => {});
 
   const state = new Map<string, { editedFiles: Set<string> }>();
 
@@ -56,36 +65,69 @@ export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
   return {
     event: async ({ event }) => {
       if (event.type === 'file.edited') {
+        const file = (event.properties as { file?: string }).file;
+        if (!file) return;
         for (const s of state.values()) {
-          s.editedFiles.add(event.properties.file);
+          s.editedFiles.add(file);
         }
+        await client.app
+          .log({
+            body: {
+              service: 'rule-inject',
+              level: 'debug',
+              message: `file.edited: ${file}`,
+            },
+          })
+          .catch(() => {});
       }
 
       if (event.type === 'session.created') {
-        getState(event.properties.info.id);
+        const id = (event.properties as { info?: { id?: string } }).info?.id;
+        if (id) getState(id);
       }
     },
 
     'tool.execute.after': async (input) => {
       if (!['write', 'edit', 'apply_patch'].includes(input.tool)) return;
-      const filePath = (input as unkown).args?.filePath ?? (input as unkown).args?.path ?? '';
+      const args = input.args as { filePath?: string; path?: string } | undefined;
+      const filePath = args?.filePath ?? args?.path ?? '';
       if (!filePath) return;
       for (const s of state.values()) {
         s.editedFiles.add(filePath);
       }
+      await client.app
+        .log({
+          body: {
+            service: 'rule-inject',
+            level: 'debug',
+            message: `tool.execute.after (${input.tool}): ${filePath}`,
+          },
+        })
+        .catch(() => {});
     },
 
     'tool.execute.before': async (input, output) => {
       if (input.tool !== 'bash') return;
 
-      const command: string = output.args?.command ?? '';
+      const command: string = output?.args?.command ?? '';
       if (!/\bgit commit\b/.test(command)) return;
 
-      const sessionID = (input as unknown).sessionID;
+      const sessionID = input.sessionID;
       if (!sessionID) return;
 
       const s = getState(sessionID);
-      if (s.editedFiles.size === 0) return;
+      if (s.editedFiles.size === 0) {
+        await client.app
+          .log({
+            body: {
+              service: 'rule-inject',
+              level: 'debug',
+              message: 'git commit detected but no edited files tracked',
+            },
+          })
+          .catch(() => {});
+        return;
+      }
 
       const ruleNames = getRulesForFiles([...s.editedFiles]);
       if (ruleNames.size === 0) {
@@ -108,6 +150,16 @@ export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
 
       const editedFiles = [...s.editedFiles];
       s.editedFiles.clear();
+
+      await client.app
+        .log({
+          body: {
+            service: 'rule-inject',
+            level: 'info',
+            message: `Blocking git commit. Files: ${editedFiles.join(', ')}`,
+          },
+        })
+        .catch(() => {});
 
       throw new Error(
         `

@@ -1,4 +1,5 @@
 import { jsxRenderer } from 'hono/jsx-renderer';
+import { Link, Script } from 'honox/server';
 
 export default jsxRenderer(({ children }) => {
   return (
@@ -7,12 +8,8 @@ export default jsxRenderer(({ children }) => {
         <meta charset='UTF-8' />
         <meta name='viewport' content='width=device-width, initial-scale=1.0' />
         <title>Goal Task Idea</title>
-        <link rel='stylesheet' href='/app/style.css' />
-        {import.meta.env.PROD ? (
-          <script type='module' src='/static/client.js'></script>
-        ) : (
-          <script type='module' src='/app/client.ts'></script>
-        )}
+        <Link rel='stylesheet' href='/app/style.css' />
+        <Script src='/app/client.ts' />
       </head>
       <body>{children}</body>
     </html>

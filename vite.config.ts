@@ -1,5 +1,5 @@
 import build from '@hono/vite-build/cloudflare-workers';
-import adapter from '@hono/vite-dev-server/node';
+import adapter from '@hono/vite-dev-server/cloudflare';
 import tailwindcss from '@tailwindcss/vite';
 import client from 'honox/vite/client';
 import honox from 'honox/vite';

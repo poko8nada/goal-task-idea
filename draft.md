@@ -1,5 +1,7 @@
 # draft
 
+<!-- rule-inject plugin test -->
+
 ## 概要
 
 ガントチャート風の目標・タスク管理アプリケーション。

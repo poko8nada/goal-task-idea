@@ -1,69 +1,13 @@
 import { useRef, useEffect } from 'hono/jsx';
-import { useCanvas } from '../lib/useCanvas';
-import type { Item, Position } from '../lib/types';
-import { GRID_SIZE } from '../lib/types';
-import { ItemCard } from '../components/ItemCard';
+import { useCanvas } from '@/lib/useCanvas';
+import type { Item, Position, GoalItem, TaskItem, NoteItem } from '@/lib/types';
+import { GRID_SIZE } from '@/lib/types';
+import { SAMPLE_ITEMS } from '@/lib/sample';
+import { StatusPill } from '@/components/StatusPill';
 
 interface CanvasProps {
   initialItems?: Item[];
 }
-
-const SAMPLE_ITEMS: Item[] = [
-  {
-    id: 'goal-1',
-    type: 'goal',
-    title: '基礎を学ぶ',
-    status: 'done',
-    dependsOn: [],
-    position: { x: 100, y: 100 },
-  },
-  {
-    id: 'goal-2',
-    type: 'goal',
-    title: 'プロジェクトを作る',
-    status: 'in_progress',
-    dependsOn: ['goal-1'],
-    position: { x: 400, y: 100 },
-  },
-  {
-    id: 'goal-3',
-    type: 'goal',
-    title: 'デプロイする',
-    status: 'todo',
-    dependsOn: ['goal-2'],
-    position: { x: 700, y: 100 },
-  },
-  {
-    id: 'task-1',
-    type: 'task',
-    title: 'ドキュメントを読む',
-    status: 'done',
-    goalId: 'goal-1',
-    position: { x: 120, y: 220 },
-  },
-  {
-    id: 'task-2',
-    type: 'task',
-    title: 'サンプルを動かす',
-    status: 'done',
-    goalId: 'goal-1',
-    position: { x: 120, y: 280 },
-  },
-  {
-    id: 'task-3',
-    type: 'task',
-    title: '要件定義',
-    status: 'in_progress',
-    goalId: 'goal-2',
-    position: { x: 420, y: 220 },
-  },
-  {
-    id: 'note-1',
-    type: 'note',
-    title: 'Next.jsも調べてみる',
-    position: { x: 250, y: 350 },
-  },
-];
 
 export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -210,6 +154,17 @@ export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
     backgroundPosition: `${pan.x}px ${pan.y}px`,
   };
 
+  const goals = items.filter((i): i is GoalItem => i.type === 'goal');
+  const tasks = items.filter((i): i is TaskItem => i.type === 'task');
+  const notes = items.filter((i): i is NoteItem => i.type === 'note');
+
+  const tasksByGoal = new Map<string, TaskItem[]>();
+  for (const t of tasks) {
+    const arr = tasksByGoal.get(t.goalId) ?? [];
+    arr.push(t);
+    tasksByGoal.set(t.goalId, arr);
+  }
+
   return (
     <div
       ref={containerRef}
@@ -220,9 +175,58 @@ export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
         class='absolute top-0 left-0 origin-top-left'
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
       >
-        {items.map((item) => (
-          <ItemCard key={item.id} item={item} onDragStart={() => {}} />
+        {goals.map((goal) => {
+          const ownedTasks = tasksByGoal.get(goal.id) ?? [];
+          return (
+            <div
+              key={goal.id}
+              data-goal-group={goal.id}
+              class='absolute w-64 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow'
+              style={{ left: `${goal.position.x}px`, top: `${goal.position.y}px` }}
+            >
+              <div
+                data-item-id={goal.id}
+                class='cursor-grab select-none px-4 py-3 border-b border-gray-100'
+              >
+                <div class='flex items-center justify-between mb-1.5'>
+                  <span class='text-[11px] font-medium text-gray-400 tracking-wide uppercase'>Goal</span>
+                  <StatusPill status={goal.status} />
+                </div>
+                <div class='text-[15px] font-semibold text-gray-900 leading-snug'>{goal.title}</div>
+                {goal.deadline && <div class='text-xs text-gray-500 mt-1'>{goal.deadline}</div>}
+              </div>
+              {ownedTasks.length > 0 && (
+                <ul class='py-1'>
+                  {ownedTasks.map((task) => (
+                    <li
+                      key={task.id}
+                      data-item-id={task.id}
+                      class='flex items-center gap-2 px-4 py-1.5 hover:bg-gray-50 cursor-grab select-none text-sm'
+                    >
+                      <span class='text-gray-300 text-xs'>·</span>
+                      <span class='flex-1 text-gray-700'>{task.title}</span>
+                      <StatusPill status={task.status} compact />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+        {notes.map((note) => (
+          <div
+            key={note.id}
+            data-item-id={note.id}
+            class='absolute w-48 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm shadow-sm cursor-grab select-none hover:bg-white transition-colors'
+            style={{ left: `${note.position.x}px`, top: `${note.position.y}px` }}
+          >
+            <div class='text-[11px] font-medium text-gray-400 tracking-wide uppercase mb-0.5'>Note</div>
+            <div class='text-gray-700 leading-snug'>{note.title}</div>
+          </div>
         ))}
+      </div>
+      <div class='absolute bottom-2 right-2 bg-white/80 px-2 py-1 text-xs rounded text-gray-600'>
+        {Math.round(scale * 100)}% | ({Math.round(pan.x)}, {Math.round(pan.y)})
       </div>
       <div class='absolute bottom-2 right-2 bg-white/80 px-2 py-1 text-xs rounded text-gray-600'>
         {Math.round(scale * 100)}% | ({Math.round(pan.x)}, {Math.round(pan.y)})

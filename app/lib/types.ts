@@ -34,12 +34,6 @@ export interface NoteItem extends BaseItem {
 
 export type Item = GoalItem | TaskItem | NoteItem;
 
-export interface CanvasState {
-  scale: number;
-  pan: Position;
-  items: Item[];
-}
-
 export const GRID_SIZE = 20;
 export const MIN_SCALE = 0.1;
 export const MAX_SCALE = 5;

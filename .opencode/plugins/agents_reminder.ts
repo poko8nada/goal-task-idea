@@ -73,11 +73,14 @@ export const AgentsReminderPlugin: Plugin = async ({ directory }) => {
           ? `${reminder}\n\n---\n\n# AGENTS.md\n\n${agentsMd}\n\n---`
           : `${reminder}\n\n---`;
 
+      const messageID = output.message.id;
+      if (!messageID) return;
+
       output.parts.unshift({
         type: 'text',
-        id: crypto.randomUUID(),
+        id: `prt_${crypto.randomUUID()}`,
         sessionID: input.sessionID,
-        messageID: input.messageID ?? '',
+        messageID,
         text,
       });
     },

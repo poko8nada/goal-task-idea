@@ -21,7 +21,7 @@ There is no fixed flow. The user and the agent pick the next step together. The 
 - **Implementation** → `/implement` (Pre-check → Build → Verify → Confirm)
 - **After approval** → `/apply-pattern` (if pattern scope was decided in Pre-check)
 - **During discussion** → `/reflect` (progress review, direction check)
-- **Session end** → `/memory` (save meta insights about the user; not session state — use /reflect for that)
+- **Session end** → `/session-cleanup` (commit, push, PR, branch cleanup; use /memory for meta insights)
 
 Skills provide specialized instructions and workflows for specific tasks.
 Use the skill tool to load a skill when a task matches its description.

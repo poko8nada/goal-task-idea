@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
 
@@ -17,7 +18,16 @@ const IGNORE_DIRS = new Set([
   'coverage',
 ]);
 
-const LAYER_2_PATH = path.join('.opencode', 'skills', 'memory', 'store', 'layer-2.md');
+// グローバル opencode 配下の memory Layer 2 を直接参照
+// $XDG_CONFIG_HOME を優先、未設定なら ~/.config にフォールバック
+const LAYER_2_PATH = path.join(
+  process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'),
+  'opencode',
+  'skills',
+  'memory',
+  'store',
+  'layer-2.md',
+);
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -115,7 +125,7 @@ type InjectStatus = {
 
 function buildInjectStatus(worktree: string): InjectStatus {
   const agentsPath = path.join(worktree, 'AGENTS.md');
-  const layer2Path = path.join(worktree, LAYER_2_PATH);
+  const layer2Path = LAYER_2_PATH;
   const readmePath = path.join(worktree, 'README.md');
 
   return {
@@ -148,8 +158,8 @@ function buildAgentsContext(worktree: string): string {
   return readIfExists(path.join(worktree, 'AGENTS.md'), 4000);
 }
 
-function buildLayer2Context(worktree: string): string {
-  return readIfExists(path.join(worktree, LAYER_2_PATH), 2000);
+function buildLayer2Context(_worktree: string): string {
+  return readIfExists(LAYER_2_PATH, 2000);
 }
 
 function buildProjectContext(worktree: string): string {

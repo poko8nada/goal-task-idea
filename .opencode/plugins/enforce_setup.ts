@@ -1,5 +1,26 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import { tool } from '@opencode-ai/plugin';
+
+function isMetaFile(filePath: string): boolean {
+  const basename = filePath.split('/').pop() ?? '';
+  const metaFilenames = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md', '.cursorrules'];
+  const metaPathPatterns = [
+    '.opencode/',
+    '/.config/opencode/',
+    '.cursor/',
+    '.clinerules/',
+    '.cline/',
+    '.windsurf/',
+    '.windsurfrules',
+    '.roo/',
+    '.roorules',
+    '.claude/',
+    '.aider/',
+    '.continue/',
+  ];
+  if (metaFilenames.includes(basename)) return true;
+  if (metaPathPatterns.some((p) => filePath.includes(p))) return true;
+  return false;
+}
 
 export const EnforceSetupPlugin: Plugin = async () => {
   let setupAgreed = false;
@@ -13,26 +34,17 @@ export const EnforceSetupPlugin: Plugin = async () => {
       }
     },
 
-    tool: {
-      setup_agree: tool({
-        description:
-          'Signal that the user has agreed to the current Orient (Goal, Gate, Risks & Gaps) from /setup. Call this after the user explicitly agrees, before editing files. The harness resets this state after every git commit, so call it again for each new Goal.',
-        args: {},
-        async execute() {
-          setupAgreed = true;
-          isFirstInteraction = false;
-          return 'OK, setup agreed. You may now edit files until the next commit.';
-        },
-      }),
-    },
-
-    'tool.execute.before': async (input) => {
+    'tool.execute.before': async (input, output) => {
       if (!['edit', 'write', 'apply_patch'].includes(input.tool)) return;
+
+      const args = (output?.args ?? {}) as Record<string, unknown>;
+      const filePath = String(args.filePath ?? args.path ?? args.file ?? '');
+      if (isMetaFile(filePath)) return;
 
       if (!setupAgreed) {
         const msg = isFirstInteraction
-          ? '[enforce-setup] Setup not agreed. Run /setup with the user, get their agreement on the Orient, then call `setup_agree` to signal the harness.'
-          : '[enforce-setup] Setup no longer agreed (likely after a commit). Run /reflect to recover context, then /setup and `setup_agree` for the next Goal.';
+          ? '[enforce-setup] Setup not agreed. Run /setup with the user, get their agreement on the Orient, then run `echo "setup-ack"` in a bash command to signal the harness.'
+          : '[enforce-setup] Setup no longer agreed (likely after a commit). Run /reflect to recover context, then /setup and `echo "setup-ack"` for the next Goal.';
         throw new Error(msg);
       }
 
@@ -42,8 +54,9 @@ export const EnforceSetupPlugin: Plugin = async () => {
     'tool.execute.after': async (input) => {
       if (input.tool !== 'bash') return;
       const command: string = (input.args as { command?: string } | undefined)?.command ?? '';
-      if (/\bgit commit\b/.test(command)) {
-        setupAgreed = false;
+      if (/\becho\s+["']setup-ack["']/.test(command)) {
+        setupAgreed = true;
+        isFirstInteraction = false;
       }
     },
   };

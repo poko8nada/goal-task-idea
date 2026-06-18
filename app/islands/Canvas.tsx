@@ -189,7 +189,9 @@ export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
                 class='cursor-grab select-none px-4 py-3 border-b border-gray-100'
               >
                 <div class='flex items-center justify-between mb-1.5'>
-                  <span class='text-[11px] font-medium text-gray-400 tracking-wide uppercase'>Goal</span>
+                  <span class='text-[11px] font-medium text-gray-400 tracking-wide uppercase'>
+                    Goal
+                  </span>
                   <StatusPill status={goal.status} />
                 </div>
                 <div class='text-[15px] font-semibold text-gray-900 leading-snug'>{goal.title}</div>
@@ -220,7 +222,9 @@ export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
             class='absolute w-48 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm shadow-sm cursor-grab select-none hover:bg-white transition-colors'
             style={{ left: `${note.position.x}px`, top: `${note.position.y}px` }}
           >
-            <div class='text-[11px] font-medium text-gray-400 tracking-wide uppercase mb-0.5'>Note</div>
+            <div class='text-[11px] font-medium text-gray-400 tracking-wide uppercase mb-0.5'>
+              Note
+            </div>
             <div class='text-gray-700 leading-snug'>{note.title}</div>
           </div>
         ))}

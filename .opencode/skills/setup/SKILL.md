@@ -45,3 +45,5 @@ Show the current state of agreement. Keep it short.
 ## Hand off
 
 When Goal and Gate are agreed and Risks & Gaps are addressed, the agent proposes the next step based on the discussion.
+
+After the user explicitly agrees to the Orient output, call the `setup_agree` tool (provided by the `enforce_setup` harness) to signal that the gate has been passed. Until this signal is sent, the harness will block any file edits. The harness also resets this signal after every `git commit`, so call `setup_agree` again for each new Goal.

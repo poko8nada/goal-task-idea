@@ -6,14 +6,11 @@ compatibility: opencode
 
 # Skill: implement
 
-Trigger this skill when it's time to build a unit. The unit may
-already be discussed in chat, or it may need a quick design check
-first.
+Trigger this skill when it's time to build a unit. The unit may already be discussed in chat, or it may need a quick design check first.
 
 ## When to use
 
-Before starting, ask: **Can this work be expressed as a vertical slice?**
-(1 end-to-end flow with a structural pattern that can be applied to other targets?)
+Before starting, ask: **Can this work be expressed as a vertical slice?** (1 end-to-end flow with a structural pattern that can be applied to other targets?)
 
 If yes → trigger another design step to articulate the slice, pattern, and apply targets. Get user agreement before building.
 
@@ -41,29 +38,21 @@ The actual articulation of slice / pattern / apply targets happens in the design
 
 ## Confirm what was discussed
 
-When the user comes straight to build without a design check,
-recap the unit briefly and get approval. Don't reopen settled
-questions — lock them in.
+When the user comes straight to build without a design check, recap the unit briefly and get approval. Don't reopen settled questions — lock them in.
 
-If something is unclear, ask. If something needs research, do it
-now (Context7, web search, codebase).
+If something is unclear, ask. If something needs research, do it now (Context7, web search, codebase).
 
 ## Build
 
-Build exactly what was confirmed. Not a stub — correct structure,
-behavior, and edge cases handled.
+Build exactly what was confirmed. Not a stub — correct structure, behavior, and edge cases handled.
 
-Keep the development environment operational at all times. The
-user should be able to verify the result at any point.
+Keep the development environment operational at all times. The user should be able to verify the result at any point.
 
-If scope changes during implementation, confirm with the user
-before expanding.
+If scope changes during implementation, confirm with the user before expanding.
 
 ## Verify
 
-After Build, run automated checks and show output. **Do not
-proceed to Confirm without showing the user the output of these
-checks.**
+After Build, run automated checks and show output. **Do not proceed to Confirm without showing the user the output of these checks.**
 
 Run:
 
@@ -74,12 +63,9 @@ Run:
 
 Show the output (or last N lines) before asking for Confirm.
 
-For UI changes, also use cmux-browser to capture a snapshot and
-show it to the user. Data layer / API / type changes don't
-require browser verification.
+For UI changes, also use cmux-browser to capture a snapshot and show it to the user. Data layer / API / type changes don't require browser verification.
 
-Use the checklist for your implementation type. Fix any failures
-before proceeding.
+Use the checklist for your implementation type. Fix any failures before proceeding.
 
 ### UI
 
@@ -124,14 +110,11 @@ before proceeding.
 
 ## Confirm
 
-List the specific changes: which files, functions, components
-were created or modified. Include the output of the Verify checks (typecheck / lint / format / test).
+List the specific changes: which files, functions, components were created or modified. Include the output of the Verify checks (typecheck / lint / format / test).
 
 If the work was a vertical slice (a design step was run), validate the pattern before proceeding:
 
-> [Changed files / functions / components]. Did the built slice
-> validate the pattern? Does it need adjustment (didn't fit,
-> missing layer, wrong abstraction)?
+> [Changed files / functions / components]. Did the built slice validate the pattern? Does it need adjustment (didn't fit, missing layer, wrong abstraction)?
 
 - Pattern validated → trigger pattern application to the remaining targets
 - Pattern needs adjustment → revise the pattern via the design step, then re-build

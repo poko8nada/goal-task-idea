@@ -7,11 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const appDir = fileURLToPath(new URL('./app', import.meta.url));
+const rootDir = fileURLToPath(new URL('./', import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: {
       '@': appDir,
+      '~': rootDir,
     },
   },
   plugins: [

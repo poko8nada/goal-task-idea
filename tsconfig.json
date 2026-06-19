@@ -5,7 +5,8 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["app/*"]
+      "@/*": ["app/*"],
+      "~/*": ["./*"]
     },
     "strict": true,
     "skipLibCheck": true,

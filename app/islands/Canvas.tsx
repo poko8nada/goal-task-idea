@@ -2,14 +2,13 @@ import { useRef, useEffect } from 'hono/jsx';
 import { useCanvas } from '@/lib/useCanvas';
 import type { Item, Position, GoalItem, TaskItem, NoteItem } from '@/lib/types';
 import { GRID_SIZE } from '@/lib/types';
-import { SAMPLE_ITEMS } from '@/lib/sample';
 import { StatusPill } from '@/components/StatusPill';
 
 interface CanvasProps {
   initialItems?: Item[];
 }
 
-export default function Canvas({ initialItems = SAMPLE_ITEMS }: CanvasProps) {
+export default function Canvas({ initialItems = [] }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scale, pan, items, snapToGrid, updateScale, updateItemPosition, setPanValue } =
     useCanvas(initialItems);

@@ -73,37 +73,53 @@ pnpm dev
 
 ## Stack
 
-| 領域        | 採用                   | 理由                                   |
-| ----------- | ---------------------- | -------------------------------------- |
-| HTTP / SSR  | Hono + HonoX           | Workers 向けの軽量、Vite と一体        |
-| Build / Dev | Vite 6                 | client / worker の二段ビルド           |
-| Edge        | Cloudflare Workers     | `wrangler` で preview / deploy         |
-| Styling     | Tailwind CSS 4         | `@tailwindcss/vite` で統合             |
-| Quality     | oxlint / oxfmt         | 高速、Lefthook で自動化                |
-| Test        | Vitest                 | `--passWithNoTests` で CI しやすい     |
-| Canvas      | 自前実装（vanilla JS） | 依存ゼロ、エージェントが読み解きやすい |
+| 領域        | 採用                   | 理由                                     |
+| ----------- | ---------------------- | ---------------------------------------- |
+| HTTP / SSR  | Hono + HonoX           | Workers 向けの軽量、Vite と一体          |
+| Build / Dev | Vite 6                 | client / worker の二段ビルド             |
+| Edge        | Cloudflare Workers     | v1 は未使用、v2 で Pages + D1 を採用予定 |
+| Storage     | v1: JSON / v2: D1      | `DataSource` で抽象化、free tier 重視    |
+| Styling     | Tailwind CSS 4         | `@tailwindcss/vite` で統合               |
+| Quality     | oxlint / oxfmt         | 高速、Lefthook で自動化                  |
+| Test        | Vitest                 | `--passWithNoTests` で CI しやすい       |
+| Canvas      | 自前実装（vanilla JS） | 依存ゼロ、エージェントが読み解きやすい   |
 
 ## App Architecture
 
 ```text
 app/
-├── client.ts            # クライアントエントリ
-├── server.ts            # SSR エントリ
-├── style.css            # Tailwind エントリ
-├── global.d.ts          # HonoX 型拡張
-├── routes/              # ファイルシステムルーティング
-│   ├── _renderer.tsx    # HTML シェル
-│   └── index.tsx        # キャンバスページ
-├── islands/             # クライアントサイドの島
-│   └── Canvas.tsx       # キャンバス実装（zoom / pan / drag / snap）
-├── components/          # 共有コンポーネント
-│   └── StatusPill.tsx   # ステータス表示
-├── lib/                 # ドメインロジック・型
-│   ├── types.ts         # Item 型定義
-│   ├── sample.ts        # サンプルデータ（Canvas の初期値）
-│   └── useCanvas.ts     # Canvas 用フック
+├── client.ts                  # クライアントエントリ
+├── server.ts                  # SSR エントリ
+├── style.css                  # Tailwind エントリ
+├── global.d.ts                # HonoX 型拡張
+├── routes/                    # ファイルシステムルーティング
+│   ├── _renderer.tsx          # HTML シェル
+│   ├── index.tsx              # キャンバスページ
+│   └── api/
+│       └── items/
+│           └── index.ts       # GET /api/items
+├── islands/                   # クライアントサイドの島
+│   └── Canvas.tsx             # キャンバス実装（zoom / pan / drag / snap）
+├── components/                # 共有コンポーネント
+│   └── StatusPill.tsx         # ステータス表示
+├── lib/                       # ドメインロジック・型
+│   ├── types.ts               # Item 型定義
+│   ├── useCanvas.ts           # Canvas 用フック
+│   └── data/                  # 永続化レイヤー（DataSource 実装）
+│       ├── source.ts          # DataSource インターフェース
+│       ├── json-file.ts       # v1: JsonFileDataSource
+│       └── index.ts           # getDataSource() factory
 └── data/
-    └── data.json        # v1 で読み込む永続データ
+    └── data.json              # v1 で読み込む永続データ
+```
+
+データフロー:
+
+```text
+[Canvas island] ──fetch──▶ [API route (/api/items)] ──▶ [DataSource (interface)]
+                                                                │
+                                                                ├─ v1: JsonFileDataSource  (app/data/data.json)
+                                                                └─ v2: D1DataSource        (Cloudflare D1)
 ```
 
 設計方針:
@@ -111,7 +127,7 @@ app/
 - **ルートは薄い** — `routes/index.tsx` は `<Canvas />` を呼ぶだけ
 - **状態は `useCanvas()` フックに集約** — scale / pan / items を一箇所で管理
 - **描画層を交換可能に** — DOM / SVG / Canvas を将来的に差し替えられるよう抽象化
-- **`Storage` インターフェースで永続化を抽象化** — v1 は `FileStorage`（`app/data/data.json`）、v2 は `D1Storage` / `KVStorage` に差し替え
+- **`DataSource` インターフェースで永続化を抽象化** — v1 は `JsonFileDataSource`（`app/data/data.json` を atomic write）、v2 は `D1DataSource`（Cloudflare D1）に差し替え。factory 1 行差替で移行
 
 データモデル:
 
@@ -149,8 +165,8 @@ interface NoteItem {
 
 ## Roadmap
 
-- **v1（現在）**: ローカル動作。`app/data/data.json` を読み込み、キャンバスに描画。`Storage` 抽象は設計のみ
-- **v2（未定）**: Cloudflare デプロイ + ログイン（実装するかもしない）
+- **v1（現在）**: ローカル動作。`app/data/data.json` を読み込み、キャンバスに描画。`DataSource` 抽象 + `JsonFileDataSource` 実装 + `GET /api/items`
+- **v2**: Cloudflare Workers + D1 デプロイ。`D1DataSource` を追加して factory 差替。CRUD API 完成。認証は別 issue で判断
 - **v3（未定）**: AI エージェント内蔵（実装するかもしない）
 
 ## Contributing

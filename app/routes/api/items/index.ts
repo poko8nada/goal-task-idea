@@ -1,9 +1,8 @@
 import { createRoute } from 'honox/factory';
-import Canvas from '@/islands/Canvas';
 import { getDataSource } from '@/lib/data';
 
-export default createRoute(async (c) => {
+export const GET = createRoute(async (c) => {
   const source = getDataSource();
   const items = await source.list();
-  return c.render(<Canvas initialItems={items} />);
+  return c.json({ items });
 });

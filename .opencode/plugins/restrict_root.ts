@@ -6,7 +6,7 @@ import * as path from 'path';
 //  /path or ~/path で始まり、空白/引用/特殊文字以外が続くものを path とみなす
 const extractPathsFromCommand = (command: string): string[] => {
   const paths: string[] = [];
-  const matches = command.matchAll(/(?:^|[\s>|&;])([/~][^\s'"<>|&;]*)/g);
+  const matches = command.matchAll(/(?:^|[\s>|&;"'])([/~][^\s'"<>|&;]*)/g);
   for (const m of matches) {
     const p = m[1];
     if (p) paths.push(p);
@@ -15,7 +15,7 @@ const extractPathsFromCommand = (command: string): string[] => {
 };
 
 export const RestrictRootPlugin: Plugin = async ({ worktree }) => {
-  const root = Bun.resolveSync(worktree, '/');
+  const root = path.resolve(worktree);
 
   // プロジェクトルート以外で許可する外部パス（例外）
   // $XDG_CONFIG_HOME を優先、未設定なら ~/.config にフォールバック
@@ -44,10 +44,10 @@ export const RestrictRootPlugin: Plugin = async ({ worktree }) => {
     'tool.execute.before': async (input, output) => {
       // bash tool: command を parse して path を check
       if (input.tool === 'bash' || input.tool === 'shell') {
-        const command = String(output.args?.command ?? '');
+        const command = String(output?.args?.command ?? '');
         for (const p of extractPathsFromCommand(command)) {
-          // flag-like pattern は skip（--option, -x 等）
           if (p.startsWith('-')) continue;
+          if (p === '/dev/null') continue;
           checkPath(p);
         }
         return;
@@ -55,7 +55,7 @@ export const RestrictRootPlugin: Plugin = async ({ worktree }) => {
 
       // file tool (edit, write, apply_patch, read 等): fileArg を check
       const fileArg: string | undefined =
-        output.args?.filePath ?? output.args?.path ?? output.args?.file ?? undefined;
+        output?.args?.filePath ?? output?.args?.path ?? output?.args?.file ?? undefined;
 
       if (!fileArg) return;
       checkPath(fileArg);

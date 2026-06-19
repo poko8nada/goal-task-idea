@@ -41,7 +41,7 @@ function resolveLines(cards: Card[], conns: Conn[]) {
   });
 }
 function dedup<T>(arr: T[]) {
-  return [...new Set(arr.map(JSON.stringify))].map(JSON.parse);
+  return [...new Set(arr.map((v) => JSON.stringify(v)))].map((v) => JSON.parse(v) as T);
 }
 
 function autoLayoutY(cards: Card[], canvasH = 400): Card[] {

@@ -43,7 +43,7 @@ Read `package.json` and config files to determine framework. Read source layout 
 - Remix → `app/routes/_prototype.tsx`
 - Qwik City → `src/routes/_prototype/index.tsx`
 - Astro → `src/pages/_prototype.astro`
-- Honox (Hono + JSX) → `app/routes/_prototype.tsx`
+- Honox (Hono + JSX) → `app/routes/prototype.tsx`
 - Plain HTML / no framework → `prototype.html` (project root)
 - Other / unclear → ask the user
 
@@ -52,6 +52,58 @@ The `_prototype` prefix signals "not part of the real app" — Next.js, Nuxt, Sv
 ### 3. Build the mockup
 
 One file. Project stack. Hardcoded values. No real functionality. All screens stacked vertically with comments or section breaks as dividers. The dev server's hot reload shows every edit.
+
+**Section format** — each section must have an `id` attribute for screenshot navigation:
+
+```tsx
+<div id="section-default" class="...">
+  <h3>1. Default state</h3>
+  <p>Subtitle explaining the state.</p>
+  {/* canvas content */}
+</div>
+
+<div id="section-context-menu" class="...">
+  <h3>2. Right-click context menu</h3>
+  {/* ... */}
+</div>
+```
+
+Naming convention: `section-{kebab-case}` (e.g., `section-default`, `section-inline-edit`, `section-delete-confirm`). The id is used by `scrollIntoView` to navigate to specific sections for screenshots.
+
+**Prototype file structure** — the outer format follows a standard pattern:
+
+```tsx
+// ── Data ──
+// Card definitions, connections, auto-layout function
+
+// ── Components ──
+// Reusable UI components (card, row, frame, section wrapper, etc.)
+
+// ── Interaction States ──
+// Each state is a component that renders a specific UI state
+
+// ── Page ──
+<div class="max-w-310 mx-auto px-6 py-8 space-y-12">
+  {/* Page header */}
+  <div>
+    <h2 class="text-lg font-bold text-gray-900 mb-1">Title</h2>
+    <p class="text-[13px] text-gray-500">
+      Description of what this prototype shows.
+    </p>
+  </div>
+
+  {/* Sections — each with id for screenshot navigation */}
+  <Section title="1. Section title" subtitle="What this section demonstrates.">
+    <div id="section-default"></div>
+  </Section>
+
+  <Section title="2. Section title" subtitle="...">
+    <div id="section-context-menu"></div>
+  </Section>
+</div>
+```
+
+Container: `max-w-310 mx-auto px-6 py-8 space-y-12` (fixed width, centered, padded, vertical spacing).
 
 Component usage — depends on the project state:
 
@@ -99,12 +151,21 @@ Replace `<N>` with the actual surface number from the `open` response. The surfa
 
 **Screenshot (what does it look like):**
 
+To screenshot a specific section, scroll to it first using the section id:
+
 ```bash
-cmux browser surface:<N> screenshot --out ./screenshots/mockup-v1.png
+# 1. scroll to the target section
+cmux browser surface:<N> eval "document.getElementById('section-default').scrollIntoView({block: 'start'})"
+
+# 2. wait for scroll to complete
+cmux browser surface:<N> wait --load-state complete --timeout-ms 3000
+
+# 3. take the screenshot
+cmux browser surface:<N> screenshot --out ./screenshots/prototype-section-default.png
 # then read the file with the read tool to see the image
 ```
 
-Use `cmux browser screenshot --out <project-relative-path>` to save into the project. Without `--out`, the command writes to `$TMPDIR/cmux-browser-screenshots/` — a global temp directory outside the project's reach.
+Use `cmux browser screenshot --out <project-relative-path>` to save into the project. Without `--out`, the command writes to `$TMPDIR/cmux-browser-screenshots/` — a global temp directory outside the project's reach. There is no `--full-page` option.
 
 Save path conventions:
 
@@ -201,3 +262,19 @@ The mockup is a snapshot. The real implementation will evolve. If the visual dri
 
 - Re-trigger this skill to refresh the mockup to match.
 - Or let the mockup stay as the original snapshot and update the implementation freely.
+
+## cmux-browser skill
+
+This skill uses cmux browser for agent-side verification. When you need to perform browser automation (navigation, interaction, DOM inspection), load the `cmux-browser` skill for the full command reference.
+
+Useful commands for prototyping:
+
+| Command                                   | Purpose                                               |
+| ----------------------------------------- | ----------------------------------------------------- |
+| `scroll-into-view <selector>`             | Navigate to a specific section by id                  |
+| `eval <js>`                               | Execute JavaScript (DOM manipulation, scroll control) |
+| `get box <selector>`                      | Get element position and size (layout verification)   |
+| `get styles <selector> --property <prop>` | Get computed CSS (style verification)                 |
+| `highlight <selector>`                    | Highlight an element (visual debugging)               |
+| `snapshot --interactive`                  | DOM snapshot with element refs                        |
+| `wait --selector <css>`                   | Wait for dynamic content to appear                    |

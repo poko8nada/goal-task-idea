@@ -36,3 +36,4 @@ English to think, Japanese to speak — token efficiency without losing human to
 - Issues: created only for substantial work (same trigger as creating a new branch in /setup). No strict "1 issue = 1 feature" rule.
 - Use pnpm for all package management. Scripts in package.json are ready to use.
 - The development environment is always operational (vertical slice).
+- System includes 3 subagents—`general`, `explore`, and `scout`—so feel free to use them actively.

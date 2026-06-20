@@ -1,468 +1,380 @@
 import { createRoute } from 'honox/factory';
-import { StatusPill } from '@/components/StatusPill';
-import { GRID_SIZE } from '@/lib/types';
-import type { ItemStatus } from '@/lib/types';
 
-const CARD_W = 240;
-const HEADER_H = 78;
-const TASK_H = 28;
-const BORDER_H = 1;
-const DOT_R = 4;
+const CARD_W = 220;
+const LANE_GAP = 32;
+const LANE_W = CARD_W + LANE_GAP;
+const HEADER_H = 66;
+const TASK_ROW_H = 30;
+const PAD_X = 12;
+const PAD_Y = 14;
+const ROW_LABEL_W = 74;
+const ROW_GAP_Y = 0;
+const TAB_W = 8;
+const CANVAS_PAD = 20;
+
+// ── Data ──
+
+type ItemStatus = 'todo' | 'in_progress' | 'done';
 
 type Card = {
   id: string;
+  project: string;
   title: string;
   status: ItemStatus;
-  x: number;
-  y: number;
-  taskCount: number;
-  dependsOn: string[];
+  timeLane: number;
   tasks?: Array<{ title: string; status: ItemStatus }>;
 };
-type Conn = { from: string; to: string };
-function cardH(c: Card) {
-  return HEADER_H + c.taskCount * TASK_H + BORDER_H;
-}
-function midY(c: Card) {
-  return c.y + cardH(c) / 2;
-}
-function srcXY(c: Card): [number, number] {
-  return [c.x + CARD_W, midY(c)];
-}
-function tgtXY(c: Card): [number, number] {
-  return [c.x, midY(c)];
-}
-function resolveLines(cards: Card[], conns: Conn[]) {
-  const m = new Map(cards.map((c) => [c.id, c]));
-  return conns.map((cn) => {
-    const a = m.get(cn.from)!,
-      b = m.get(cn.to)!;
-    return { x1: srcXY(a)[0], y1: srcXY(a)[1], x2: tgtXY(b)[0], y2: tgtXY(b)[1] };
-  });
-}
-function dedup<T>(arr: T[]) {
-  return [...new Set(arr.map((v) => JSON.stringify(v)))].map((v) => JSON.parse(v) as T);
-}
 
-function autoLayoutY(cards: Card[], canvasH = 400): Card[] {
-  const PAD = 40;
-  const groups = new Map<number, Card[]>();
-  for (const c of cards) {
-    const k = c.x;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k)!.push(c);
-  }
-  for (const [, gc] of groups) {
-    let y = PAD;
-    for (const c of gc) {
-      c.y = y;
-      y += cardH(c) + PAD;
-    }
-    const o = Math.max(0, (canvasH - y + PAD) / 2);
-    for (const c of gc) c.y += o;
-  }
-  return cards;
-}
+type ProjectRow = {
+  id: string;
+  name: string;
+  accent: string;
+  track: string;
+  bg: string;
+};
 
-function SvgLayer({ cards, conns, markerId }: { cards: Card[]; conns: Conn[]; markerId: string }) {
-  const lines = resolveLines(cards, conns);
-  const map = new Map(cards.map((c) => [c.id, c]));
-  const srcPts = dedup(conns.map((c) => srcXY(map.get(c.from)!)));
-  const tgtPts = dedup(conns.map((c) => tgtXY(map.get(c.to)!)));
+function Dot({ status, compact }: { status: ItemStatus; compact?: boolean }) {
+  const c: Record<string, string> = {
+    done: 'bg-emerald-500',
+    in_progress: 'bg-amber-400',
+    todo: 'bg-gray-300',
+  };
+  const l: Record<string, string> = { done: 'done', in_progress: 'in progress', todo: 'todo' };
   return (
-    <svg class='absolute inset-0 pointer-events-none' style={{ width: 1200, height: 500 }}>
-      <defs>
-        <marker id={markerId} markerWidth='8' markerHeight='6' refX='7' refY='3' orient='auto'>
-          <path d='M0,0 L8,3 L0,6 Z' fill='#374151' />
-        </marker>
-      </defs>
-      {lines.map((l, i) => (
-        <line
-          key={`l${i}`}
-          x1={l.x1}
-          y1={l.y1}
-          x2={l.x2}
-          y2={l.y2}
-          stroke='#374151'
-          strokeWidth='1.5'
-          markerEnd={`url(#${markerId})`}
-        />
-      ))}
-      {srcPts.map(([cx, cy], i) => (
-        <circle key={`s${i}`} cx={cx} cy={cy} r={DOT_R} fill='#3b82f6' />
-      ))}
-      {tgtPts.map(([cx, cy], i) => (
-        <circle key={`t${i}`} cx={cx} cy={cy} r={DOT_R} fill='#f59e0b' />
-      ))}
-    </svg>
-  );
-}
-
-function GoalCard({ card, children }: { card: Card; children?: unknown }) {
-  return (
-    <div
-      style={{ left: card.x, top: card.y, width: CARD_W }}
-      class='absolute rounded-lg border border-gray-200 bg-white shadow-sm'
+    <span
+      class={`inline-flex items-center gap-1 ${compact ? 'text-[10px]' : 'text-[11px]'} text-gray-500`}
     >
-      <div class='px-3 py-2.5 border-b border-gray-100'>
-        <div class='flex items-center justify-between mb-1.5'>
-          <span class='text-[10px] font-semibold text-gray-500 tracking-wider uppercase'>Goal</span>
-          <StatusPill status={card.status} />
-        </div>
-        <div class='text-[14px] font-semibold text-gray-900 leading-snug'>{card.title}</div>
-        {card.dependsOn.length > 0 && (
-          <div class='text-[10px] text-gray-400 mt-1'>depends on: {card.dependsOn.join(', ')}</div>
-        )}
-      </div>
-      {children}
-    </div>
+      <span class={`w-1.5 h-1.5 rounded-full shrink-0 ${c[status]}`} />
+      {!compact && <span>{l[status]}</span>}
+    </span>
   );
 }
 
-function TaskRow({ title, status }: { title: string; status: ItemStatus }) {
-  return (
-    <div class='flex items-center gap-2 px-3 py-1 text-[13px] border-t border-gray-50'>
-      <span class='text-gray-300 text-xs shrink-0'>↳</span>
-      <span class='flex-1 text-gray-700'>{title}</span>
-      <StatusPill status={status} compact />
-    </div>
-  );
+// ── Layout ──
+
+function cardH(c: Card): number {
+  return HEADER_H + (c.tasks?.length ?? 0) * TASK_ROW_H;
 }
 
-function Frame({
-  cards,
-  conns,
-  markerId,
-  children,
-  w = 1200,
-  h = 400,
-}: {
-  cards: Card[];
-  conns: Conn[];
-  markerId: string;
-  children?: unknown;
-  w?: number;
-  h?: number;
-}) {
-  return (
-    <div
-      class='relative overflow-hidden border border-gray-200 rounded-xl bg-gray-50'
-      style={{ width: w, height: h }}
-    >
-      <div
-        class='absolute inset-0'
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)',
-          backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-        }}
-      />
-      <SvgLayer cards={cards} conns={conns} markerId={markerId} />
-      {cards.map((c) => (
-        <GoalCard key={c.id} card={c}>
-          {c.tasks?.map((t, i) => (
-            <TaskRow key={i} title={t.title} status={t.status} />
-          ))}
-        </GoalCard>
-      ))}
-      {children}
-    </div>
-  );
+function timeLaneX(lane: number): number {
+  return ROW_LABEL_W + PAD_X + lane * LANE_W;
 }
 
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: unknown;
-}) {
-  return (
-    <div>
-      <h3 class='text-[13px] font-semibold text-gray-800 mb-1'>{title}</h3>
-      <p class='text-[12px] text-gray-500 mb-3'>{subtitle}</p>
-      {children}
-    </div>
-  );
-}
-
-// ── Interaction States ──
-
-// Default cards (reused across states)
-const dA: Card = {
-  id: 'A',
-  title: 'Goal A',
-  status: 'done',
-  x: 100,
-  y: 0,
-  taskCount: 1,
-  dependsOn: [],
-  tasks: [{ title: 'task 1', status: 'done' }],
-};
-const dB: Card = {
-  id: 'B',
-  title: 'Goal B',
-  status: 'done',
-  x: 100,
-  y: 0,
-  taskCount: 1,
-  dependsOn: [],
-  tasks: [{ title: 'task 2', status: 'done' }],
-};
-const dC: Card = {
-  id: 'C',
-  title: 'Goal C',
-  status: 'in_progress',
-  x: 400,
-  y: 0,
-  taskCount: 1,
-  dependsOn: ['A', 'B'],
-  tasks: [{ title: 'task 3', status: 'in_progress' }],
-};
-const dD: Card = {
-  id: 'D',
-  title: 'Goal D',
-  status: 'todo',
-  x: 700,
-  y: 0,
-  taskCount: 0,
-  dependsOn: ['C'],
-};
-const baseConns: Conn[] = [
-  { from: 'A', to: 'C' },
-  { from: 'B', to: 'C' },
-  { from: 'C', to: 'D' },
+const rows: ProjectRow[] = [
+  { id: 'P1', name: 'アプリ開発', accent: 'text-blue-600', track: '#93c5fd', bg: '#eff6ff' },
+  { id: 'P2', name: 'ブログ運営', accent: 'text-amber-600', track: '#fcd34d', bg: '#fffbeb' },
 ];
 
-// State 1: Default (hover on Goal B → show ✕ + editable)
-function StateDefault() {
-  return (
-    <Frame cards={autoLayoutY([dA, dB, dC, dD])} conns={baseConns} markerId='s1'>
-      {/* Hover state on Goal B: ✕ button + editable highlight */}
-      <div
-        style={{ left: dB.x + CARD_W - 20, top: dB.y + 4 }}
-        class='absolute w-4 h-4 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] cursor-pointer hover:bg-red-50 hover:text-red-500'
-      >
-        ✕
-      </div>
-      <div
-        style={{ left: dB.x + 2, top: dB.y + 2, width: CARD_W - 4, height: cardH(dB) - 4 }}
-        class='absolute rounded-lg border-2 border-blue-300 pointer-events-none'
-      />
-    </Frame>
-  );
-}
+const cards: Card[] = [
+  {
+    id: 'p1a',
+    project: 'P1',
+    title: '要件定義',
+    status: 'done',
+    timeLane: 0,
+    tasks: [{ title: 'ヒアリング', status: 'done' }],
+  },
+  {
+    id: 'p1b',
+    project: 'P1',
+    title: '設計',
+    status: 'done',
+    timeLane: 1,
+    tasks: [
+      { title: '画面設計', status: 'done' },
+      { title: 'DB設計', status: 'done' },
+    ],
+  },
+  {
+    id: 'p1c',
+    project: 'P1',
+    title: '実装',
+    status: 'in_progress',
+    timeLane: 2,
+    tasks: [
+      { title: 'API作成', status: 'in_progress' },
+      { title: '画面作成', status: 'todo' },
+    ],
+  },
+  { id: 'p1d', project: 'P1', title: 'テスト', status: 'todo', timeLane: 4, tasks: [] },
+  {
+    id: 'p2a',
+    project: 'P2',
+    title: '記事構成',
+    status: 'done',
+    timeLane: 1,
+    tasks: [{ title: 'キーワード選定', status: 'done' }],
+  },
+  {
+    id: 'p2b',
+    project: 'P2',
+    title: '執筆',
+    status: 'in_progress',
+    timeLane: 2,
+    tasks: [{ title: '本文作成', status: 'in_progress' }],
+  },
+  { id: 'p2c', project: 'P2', title: '公開・分析', status: 'todo', timeLane: 3, tasks: [] },
+];
 
-// State 2: Right-click context menu (create standalone goal)
-function StateContextMenu() {
-  return (
-    <Frame cards={autoLayoutY([dA, dB, dC, dD])} conns={baseConns} markerId='s2'>
-      {/* Context menu at click position */}
-      <div
-        style={{ left: 650, top: 250 }}
-        class='absolute bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-48 z-10'
-      >
-        <div class='px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 cursor-pointer'>
-          ここにゴールを作成
-        </div>
-        <div class='px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 cursor-pointer'>
-          タスクを貼り付け
-        </div>
-        <div class='border-t border-gray-100 my-0.5' />
-        <div class='px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 cursor-pointer'>
-          すべて選択
-        </div>
-      </div>
-      {/* Ghost card at click position */}
-      <div
-        style={{ left: 650, top: 300, width: CARD_W }}
-        class='absolute rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/50 px-3 py-2.5'
-      >
-        <div class='text-[12px] text-blue-400'>新しいゴール</div>
-      </div>
-    </Frame>
-  );
-}
+const crossConns: Array<{ from: string; to: string }> = [{ from: 'p1c', to: 'p2b' }];
 
-// State 3: Connection point drag (creating connected goal)
-function StateDragConnect() {
-  return (
-    <Frame cards={autoLayoutY([dA, dB, dC, dD])} conns={baseConns} markerId='s3'>
-      {/* Drag line from B's source to new position */}
-      <svg class='absolute inset-0 pointer-events-none' style={{ width: 1200, height: 500 }}>
-        <line
-          x1={srcXY(dB)[0]}
-          y1={srcXY(dB)[1]}
-          x2={650}
-          y2={350}
-          stroke='#3b82f6'
-          strokeWidth='2'
-          strokeDasharray='6 3'
-        />
-        <circle
-          cx={650}
-          cy={350}
-          r={6}
-          fill='#3b82f6'
-          fillOpacity='0.3'
-          stroke='#3b82f6'
-          strokeWidth='2'
-        />
-      </svg>
-      {/* Ghost card at drag endpoint */}
-      <div
-        style={{ left: 650 - CARD_W, top: 350 - 40, width: CARD_W }}
-        class='absolute rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/50 px-3 py-2.5'
-      >
-        <div class='text-[12px] text-blue-400'>新しいゴール (B に接続)</div>
-      </div>
-      {/* Highlight B's source point */}
-      <div
-        style={{ left: srcXY(dB)[0] - 6, top: srcXY(dB)[1] - 6 }}
-        class='absolute w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-200'
-      />
-    </Frame>
-  );
-}
+// ── Page ──
 
-// State 4: Task creation (expanded goal card)
-function StateTaskCreation() {
-  const expandedCard: Card = { ...dC, y: 80 };
-  return (
-    <Frame cards={autoLayoutY([dA, dB, expandedCard, dD])} conns={baseConns} markerId='s4' h={480}>
-      {/* "+ タスクを追加" button rendered below Goal C's task list */}
-      <div
-        style={{ left: dC.x, top: 80 + cardH(dC), width: CARD_W }}
-        class='absolute bg-white border border-t-0 border-gray-200 rounded-b-lg shadow-sm px-3 py-1.5 text-[12px] flex items-center gap-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 cursor-pointer'
-      >
-        <span class='text-[10px] font-bold'>+</span> タスクを追加
-      </div>
-    </Frame>
-  );
-}
+export default createRoute((ctx) => {
+  // Group cards by project
+  const pjCards = rows.map((r) => cards.filter((c) => c.project === r.id));
 
-// State 5: Inline editing (double-click on title)
-function StateInlineEdit() {
-  return (
-    <Frame cards={autoLayoutY([dA, dB, dC, dD])} conns={baseConns} markerId='s5'>
-      {/* Inline editor on Goal C's title */}
-      <div
-        style={{ left: dC.x + 12, top: dC.y + 42, width: CARD_W - 24 }}
-        class='absolute bg-white border border-blue-500 rounded px-2 py-1 shadow-sm z-10'
-      >
-        <input
-          type='text'
-          defaultValue='Goal C'
-          aria-label='Goal title'
-          class='w-full text-[14px] font-semibold text-gray-900 outline-none'
-        />
-      </div>
-      {/* Status dropdown */}
-      <div
-        style={{ left: dC.x + 12, top: dC.y + 68, width: 120 }}
-        class='absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-10'
-      >
-        <div class='px-2 py-1 text-[11px] hover:bg-gray-50 flex items-center gap-1.5'>
-          <span class='w-1.5 h-1.5 rounded-full bg-gray-300' /> todo
-        </div>
-        <div class='px-2 py-1 text-[11px] hover:bg-gray-50 flex items-center gap-1.5 bg-blue-50'>
-          <span class='w-1.5 h-1.5 rounded-full bg-amber-400' /> in progress
-        </div>
-        <div class='px-2 py-1 text-[11px] hover:bg-gray-50 flex items-center gap-1.5'>
-          <span class='w-1.5 h-1.5 rounded-full bg-emerald-500' /> done
-        </div>
-      </div>
-    </Frame>
-  );
-}
+  // Compute row heights (based on tallest card + padding)
+  const rowHeights: number[] = pjCards.map((cs) => {
+    let max = 0;
+    for (const c of cs) {
+      const h = cardH(c);
+      if (h > max) max = h;
+    }
+    return Math.max(max, 40) + PAD_Y * 2 + 12;
+  });
 
-// State 6: Delete confirmation (simplified — no options, just confirm)
-function StateDeleteConfirm() {
-  return (
-    <div class='relative'>
-      <Frame cards={autoLayoutY([dA, dB, dC, dD])} conns={baseConns} markerId='s6'>
-        {/* Highlight Goal C for deletion */}
-        <div
-          style={{ left: dC.x - 2, top: dC.y - 2, width: CARD_W + 4, height: cardH(dC) + 4 }}
-          class='absolute rounded-lg border-2 border-red-400 pointer-events-none'
-        />
-      </Frame>
-      {/* Modal overlay */}
-      <div
-        class='absolute inset-0 bg-black/30 flex items-center justify-center'
-        style={{ width: 1200, height: 400 }}
-      >
-        <div class='bg-white rounded-lg shadow-xl w-105 border border-gray-200'>
-          <div class='px-5 py-4'>
-            <h4 class='text-[15px] font-semibold text-gray-900 mb-2'>このゴールを削除しますか?</h4>
-            <p class='text-[12px] text-gray-600 leading-relaxed'>
-              「Goal C」を削除すると、接続していた 2 本の矢印 (A→C, B→C) と 1 本の矢印 (C→D)
-              が切断されます。
-            </p>
-          </div>
-          <div class='px-5 py-3 border-t border-gray-100 flex justify-end gap-2'>
-            <button class='px-3 py-1.5 text-[12px] text-gray-700 border border-gray-200 rounded'>
-              キャンセル
-            </button>
-            <button class='px-3 py-1.5 text-[12px] text-white bg-red-600 rounded'>削除</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+  // Row Y offsets (for cross-PJ arrow positioning)
+  const rowYOffs: number[] = [0];
+  for (let i = 1; i < rows.length; i++) {
+    rowYOffs.push(rowYOffs[i - 1] + rowHeights[i - 1] + ROW_GAP_Y);
+  }
 
-export default createRoute((c) =>
-  c.render(
-    <div class='max-w-310 mx-auto px-6 py-8 space-y-12'>
+  const totalH = rowYOffs[rowYOffs.length - 1] + rowHeights[rowHeights.length - 1] + CANVAS_PAD * 2;
+
+  // Max lane for canvas width
+  const maxLane = Math.max(...cards.map((c) => c.timeLane), 0);
+  const totalW = timeLaneX(maxLane + 1) + PAD_X;
+
+  // Per-project data
+  const pjMaxLane = new Map<string, number>();
+  const pjMinX = new Map<string, number>();
+  const pjMaxX = new Map<string, number>();
+  for (const c of cards) {
+    const cur = pjMaxLane.get(c.project) ?? -1;
+    if (c.timeLane > cur) pjMaxLane.set(c.project, c.timeLane);
+  }
+  for (const c of cards) {
+    const x = timeLaneX(c.timeLane);
+    const l = pjMinX.get(c.project);
+    const r = pjMaxX.get(c.project);
+    if (l === undefined || x < l) pjMinX.set(c.project, x);
+    if (r === undefined || x + CARD_W > r) pjMaxX.set(c.project, x + CARD_W);
+  }
+
+  // Card position lookup for cross-PJ arrows
+  const cardPos = new Map<string, { x: number; y: number; h: number; row: number }>();
+  for (let ri = 0; ri < rows.length; ri++) {
+    for (const c of pjCards[ri]) {
+      cardPos.set(c.id, {
+        x: timeLaneX(c.timeLane),
+        y: PAD_Y,
+        h: cardH(c),
+        row: ri,
+      });
+    }
+  }
+
+  const canvasW = Math.max(800, totalW + CANVAS_PAD * 2);
+
+  return ctx.render(
+    <div class='px-2 py-8 space-y-12'>
       <div>
-        <h2 class='text-lg font-bold text-gray-900 mb-1'>v1 Canvas — Interaction States</h2>
-        <p class='text-[13px] text-gray-500'>各操作の視覚的イメージ。複数の状態を 1 画面に表示。</p>
+        <h2 class='text-lg font-bold text-gray-900 mb-1'>v2 Canvas — Swimlane Layout</h2>
+        <p class='text-[13px] text-gray-500'>
+          PJごとに独立したスイムレーン。色付きトラックラインとエッジタブで流れを表現。
+        </p>
       </div>
 
-      <Section
-        title='1. Default (hover on Goal B)'
-        subtitle='card を hover すると右上に ✕ ボタン + 選択枠が表示される。'
-      >
-        <StateDefault />
-      </Section>
+      <div>
+        <h3 class='text-[13px] font-semibold text-gray-800 mb-1'>1. Default</h3>
+        <p class='text-[12px] text-gray-500 mb-3'>
+          PJ間の依存は同一時間レーン内のみ。実装→執筆を垂直の破線矢印で表示。
+        </p>
 
-      <Section
-        title='2. Right-click context menu'
-        subtitle='canvas 空白を右クリック → 独立した goal を作成。ここにゴールを作成を click。'
-      >
-        <StateContextMenu />
-      </Section>
+        <div id='section-default' class='relative' style={{ width: canvasW, padding: CANVAS_PAD }}>
+          {/* Canvas background panel */}
+          <div
+            class='absolute inset-0 rounded-xl border border-gray-200 shadow-sm'
+            style={{
+              height: totalH,
+              backgroundColor: '#fafaf9',
+              backgroundImage:
+                'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+            }}
+          />
 
-      <Section
-        title='3. Connection point drag'
-        subtitle='Goal B の右端 (青丸) を drag → 新規 goal 作成 + 矢印自動接続。'
-      >
-        <StateDragConnect />
-      </Section>
+          {/* Cross-PJ dependency arrows (overlay above all rows) */}
+          <svg
+            class='absolute inset-0 pointer-events-none z-10'
+            style={{ width: '100%', height: totalH }}
+          >
+            {crossConns.map((cn, i) => {
+              const src = cardPos.get(cn.from);
+              const tgt = cardPos.get(cn.to);
+              if (!src || !tgt) return null;
+              const cx = src.x + CARD_W / 2;
+              const srcY = rowYOffs[src.row] + src.y + src.h;
+              const tgtY = rowYOffs[tgt.row] + tgt.y;
+              return (
+                <>
+                  <line
+                    key={`cl${i}`}
+                    x1={cx}
+                    y1={srcY + 4}
+                    x2={cx}
+                    y2={tgtY - 4}
+                    stroke='#9ca3af'
+                    strokeWidth='1.5'
+                  />
+                  {/* Source tab (bottom of source card) */}
+                  <rect
+                    key={`st${i}`}
+                    x={cx - 3}
+                    y={srcY}
+                    width={6}
+                    height={6}
+                    rx={1}
+                    fill='#9ca3af'
+                  />
+                  {/* Target tab (top of target card) */}
+                  <rect
+                    key={`tt${i}`}
+                    x={cx - 3}
+                    y={tgtY - 6}
+                    width={6}
+                    height={6}
+                    rx={1}
+                    fill='#9ca3af'
+                  />
+                </>
+              );
+            })}
+          </svg>
 
-      <Section
-        title='4. Task creation'
-        subtitle='Goal C を click → タスク一覧展開 → 下部の「+ タスクを追加」で追加。'
-      >
-        <StateTaskCreation />
-      </Section>
+          {/* Rows */}
+          <div class='flex flex-col w-full'>
+            {rows.map((row, ri) => {
+              const cs = pjCards[ri];
+              const minX = pjMinX.get(row.id);
+              const maxX = pjMaxX.get(row.id);
+              const isFirst = ri === 0;
+              const isLast = ri === rows.length - 1;
 
-      <Section
-        title='5. Inline editing'
-        subtitle='Goal C を double-click → title / status が inline 編集モードに。'
-      >
-        <StateInlineEdit />
-      </Section>
+              return (
+                <div key={`row-${ri}`}>
+                  {/* Separator between rows: solid (label area) + dashed (card area) */}
+                  {!isFirst && (
+                    <div style={{ width: '100%', height: 1, display: 'flex' }}>
+                      <div style={{ width: ROW_LABEL_W, height: 1, backgroundColor: '#e5e7eb' }} />
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 1,
+                          backgroundImage:
+                            'repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 4px, transparent 4px, transparent 8px)',
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div
+                    class={`relative bg-white ${isFirst ? 'border-t rounded-tl-lg' : ''} ${isLast ? 'border-b rounded-bl-lg' : ''} border-l border-r border-gray-300 rounded-l-lg`}
+                    style={{ width: '100%', height: rowHeights[ri] }}
+                  >
+                    {/* Time lane vertical separators */}
+                    {Array.from({ length: 7 }, (_, i) => (
+                      <div
+                        key={`vl-${i}`}
+                        class='absolute top-0 bottom-0 border-l border-dashed border-gray-200'
+                        style={{ left: timeLaneX(i) - LANE_GAP / 2 }}
+                      />
+                    ))}
 
-      <Section
-        title='6. Delete confirmation'
-        subtitle='✕ ボタン click → 確認モーダル (選択肢なし、矢印が切れるだけ)。'
-      >
-        <StateDeleteConfirm />
-      </Section>
+                    {/* Label area */}
+                    <div
+                      class='absolute top-0 bottom-0 border-r border-gray-200 bg-white/60 flex items-center px-1.5'
+                      style={{ width: ROW_LABEL_W }}
+                    >
+                      <div class='flex items-center gap-1 w-full'>
+                        <div class='flex flex-col gap-[2px] opacity-25 shrink-0'>
+                          <div class='w-[10px] h-[2px] rounded-full bg-gray-400' />
+                          <div class='w-[10px] h-[2px] rounded-full bg-gray-400' />
+                          <div class='w-[10px] h-[2px] rounded-full bg-gray-400' />
+                        </div>
+                        <span
+                          class={`text-[11px] font-semibold ${row.accent} leading-tight truncate`}
+                        >
+                          {row.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Track line */}
+                    {minX !== undefined && maxX !== undefined && (
+                      <div
+                        class='absolute'
+                        style={{
+                          top: PAD_Y + HEADER_H / 2,
+                          left: minX,
+                          width: maxX - minX,
+                          height: 2,
+                          backgroundColor: row.track,
+                        }}
+                      />
+                    )}
+
+                    {/* Cards */}
+                    {cs.map((cp) => {
+                      const x = timeLaneX(cp.timeLane);
+                      const isLastCard = cp.timeLane === (pjMaxLane.get(cp.project) ?? 0);
+                      const isP1 = cp.project === 'P1';
+                      return (
+                        <div
+                          key={cp.id}
+                          style={{ left: x, top: PAD_Y, width: CARD_W }}
+                          class={`absolute rounded-lg border border-gray-200 bg-white shadow-sm ${isP1 ? 'border-l-blue-400' : 'border-l-amber-400'} border-l-[3px]`}
+                        >
+                          <div class='px-3 py-2 border-b border-gray-100 rounded-tr-lg'>
+                            <div class='text-[13px] font-semibold text-gray-900 leading-snug'>
+                              {cp.title}
+                            </div>
+                            <div class='mt-1'>
+                              <Dot status={cp.status} />
+                            </div>
+                          </div>
+                          {cp.tasks?.map((t, i) => (
+                            <div
+                              key={i}
+                              class='flex items-center gap-2 px-3 py-1 text-[12px] border-t border-gray-50'
+                            >
+                              <span class='text-gray-300 text-xs shrink-0'>↳</span>
+                              <span class='flex-1 text-gray-700'>{t.title}</span>
+                              <Dot status={t.status} compact />
+                            </div>
+                          ))}
+                          {!isLastCard && (
+                            <div
+                              class='absolute rounded-r-sm'
+                              style={{
+                                right: -TAB_W,
+                                top: HEADER_H / 2 - 3,
+                                width: TAB_W,
+                                height: 6,
+                                backgroundColor: isP1 ? '#93c5fd' : '#fcd34d',
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>,
-  ),
-);
+  );
+});
